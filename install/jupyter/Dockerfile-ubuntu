@@ -1,0 +1,46 @@
+FROM ubuntu:22.04
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    wget \
+    curl \
+    git \
+    openjdk-21-jre-headless \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Miniconda
+RUN wget -q https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /tmp/miniconda.sh \
+    && bash /tmp/miniconda.sh -b -p /opt/conda \
+    && rm /tmp/miniconda.sh
+
+ENV PATH="/opt/conda/bin:$PATH"
+ENV JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64
+
+# Accept Conde TOS 
+RUN conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main && \
+    conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r && \
+    conda clean -afy
+# Install NodeJS and Jupyter
+RUN conda install -y -c conda-forge nodejs=20 \
+    && pip install --no-cache-dir jupyterlab \
+    && conda clean -afy
+
+# Clone and install SysML
+WORKDIR /app
+RUN git clone --depth 1 https://github.com/Systems-Modeling/SysML-v2-Release.git
+
+WORKDIR /app/SysML-v2-Release/install/jupyter
+RUN chmod +x ./install.sh \
+    && ./install.sh \
+    && conda clean -afy
+
+# Clean up
+RUN apt-get remove -y wget git \
+    && apt-get autoremove -y \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* /tmp/* \
+    && rm -rf /opt/conda/pkgs/*
+
+EXPOSE 8888
+CMD ["jupyter", "lab", "--ip=0.0.0.0", "--port=8888", "--no-browser", "--allow-root"]
